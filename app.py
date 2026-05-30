@@ -22,8 +22,10 @@ JOGOS_COPA = [
 # Funções auxiliares de banco de dados
 def carregar_csv(arquivo, colunas):
     if os.path.exists(arquivo):
-        try: return pd.read_csv(arquivo)
-        except: return pd.DataFrame(columns=colunas)
+        try: 
+            return pd.read_csv(arquivo)
+        except: 
+            return pd.DataFrame(columns=colunas)
     return pd.DataFrame(columns=colunas)
 
 # -----------------------------------------------------------------
@@ -42,10 +44,8 @@ def calcular_ranking():
         j_id = int(res["Jogo ID"])
         p1_r = int(res["Placar 1 Real"])
         p2_r = int(res["Placar 2 Real"])
-        # Transforma a string de gols reais em uma lista limpa
         gols_reais = [g.strip().lower() for g in str(res["Gols Reais"]).split(",") if g.strip()]
         
-        # Filtra palpites para este jogo específico
         palpites_jogo = df_palpites[df_palpites["Jogo ID"] == j_id]
         
         for _, palpite in palpites_jogo.iterrows():
@@ -63,9 +63,9 @@ def calcular_ranking():
             
             if resultado_real == resultado_apostado:
                 if resultado_real == "E":
-                    pontuacao[nome] += 1  # Acertou Empate
+                    pontuacao[nome] += 1
                 else:
-                    pontuacao[nome] += 3  # Acertou Vitória de um dos lados
+                    pontuacao[nome] += 3
             
             # 2. Regra dos Marcadores de Gols (Com anulamento)
             if gols_apostados and gols_reais:
@@ -74,16 +74,13 @@ def calcular_ranking():
                 
                 for jogador in gols_apostados:
                     if jogador in gols_reais:
-                        # Conta quantos gols esse jogador fez no jogo real
                         acertos_gols += gols_reais.count(jogador)
                     else:
                         erros_gols += 1
                 
-                # O erro anula o acerto (Não pode ficar menor que zero)
                 pontos_gols = max(0, acertos_gols - erros_gols)
                 pontuacao[nome] += pontos_gols
 
-    # Formata a tabela final do ranking
     df_rank = pd.DataFrame(list(pontuacao.items()), columns=["Nome", "Pontos Totais"])
     df_rank = df_rank.sort_values(by="Pontos Totais", ascending=False).reset_index(drop=True)
     df_rank.insert(0, "Posição", df_rank.index + 1)
@@ -114,13 +111,17 @@ with aba1:
             with c5: st.write(f"**{jogo['time2']}**")
             
             gols = st.text_input(f"Quem fará os gols de {jogo['time1']} x {jogo['time2']}?", placeholder="Ex: Neymar, Vini Jr", key=f"gols_{jogo['id']}")
-            palpites_form[jogo['id']] = {"t1': jogo['time1'], 't2': jogo['time2'], "p1": p1, "p2": p2, "gols": gols}
+            
+            # CORRIGIDO: Aspas devidamente padronizadas aqui
+            palpites_form[jogo['id']] = {"t1": jogo['time1'], "t2": jogo['time2'], "p1": p1, "p2": p2, "gols": gols}
             st.write("---")
             
         if st.button("🚀 Salvar Meus Palpites"):
             df_atual = carregar_csv(ARQUIVO_JOGOS, ["Data Hora", "Nome", "Jogo ID", "Confronto", "Placar 1", "Placar 2", "Gols Apostados"])
             novas_linhas = []
-            for j_id, dados in i_items := palpites_form.items():
+            
+            # CORRIGIDO: Removido o erro de sintaxe do loop
+            for j_id, dados in palpites_form.items():
                 novas_linhas.append({
                     "Data Hora": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                     "Nome": nome.strip(),
@@ -145,12 +146,12 @@ with aba2:
     else:
         st.dataframe(df_ranking_atual, use_container_width=True, hide_index=True)
 
-# --- ABA 3: ADMINISTRAÇÃO (SÓ VOCÊ MEXE) ---
+# --- ABA 3: ADMINISTRAÇÃO ---
 with aba3:
     st.header("⚙️ Painel do Organizador")
     senha = st.text_input("Senha do Administrador:", type="password")
     
-    if senha == "1234": # Você pode mudar essa senha se quiser!
+    if senha == "1234":
         st.subheader("Inserir Resultado Oficial do Jogo")
         jogo_sel = st.selectbox("Selecione o Jogo Finalizado:", JOGOS_COPA, format_func=lambda x: f"{x['time1']} x {x['time2']}")
         
@@ -158,11 +159,10 @@ with aba3:
         with col_r1: res_p1 = st.number_input(f"Placar Real {jogo_sel['time1']}", min_value=0, step=1)
         with col_r2: res_p2 = st.number_input(f"Placar Real {jogo_sel['time2']}", min_value=0, step=1)
             
-        gols_reais_input = st.text_input("Quem marcou os gols na realidade? (Separados por vírgula)", placeholder="Ex: Neymar, Neymar, Marroquin")
+        gols_reais_input = st.text_input("Quem marcou os gols na realidade? (Separados por vírgula)", placeholder="Ex: Neymar, Neymar, Marroquino")
         
         if st.button("💾 Publicar Resultado Oficial"):
-            df_res_atual = carregar_csv(ARQUIVO_RESULTS := ARQUIVO_RESULTS if 'ARQUIVO_RESULTS' in locals() else ARQUIVO_RESULTS if 'ARQUIVO_RESULTS' in locals() else ARQUIVO_RESULTADOS, ["Jogo ID", "Placar 1 Real", "Placar 2 Real", "Gols Reais"])
-            # Remove se o jogo já tinha resultado anterior para não duplicar
+            df_res_atual = carregar_csv(ARQUIVO_RESULTADOS, ["Jogo ID", "Placar 1 Real", "Placar 2 Real", "Gols Reais"])
             df_res_atual = df_res_atual[df_res_atual["Jogo ID"] != jogo_sel["id"]]
             
             nova_linha_res = {
@@ -173,4 +173,4 @@ with aba3:
             }
             df_res_final = pd.concat([df_res_atual, pd.DataFrame([nova_linha_res])], ignore_index=True)
             df_res_final.to_csv(ARQUIVO_RESULTADOS, index=False)
-            st.success("⚽ Resultado e marcadores publicados! O ranking foi recalculado.")
+            st.success("⚽ Resultado e marcadores publicados! O ranking foi recalculado.")s
