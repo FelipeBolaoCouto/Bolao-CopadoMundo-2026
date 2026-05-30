@@ -93,25 +93,26 @@ aba1, aba2, aba3 = st.tabs(["📝 Dar Palpites", "📊 Ranking Geral", "⚙️ �
 
 # --- ABA 1: FORMULÁRIO DE PALPITES ---
 with aba1:
-    # PAINEL DE REGRAS E VALOR (ADICIONADO AQUI)
-    st.markdown("""
-    <div style="background-color: #1e293b; padding: 20px; border-radius: 10px; border-left: 5px solid #eab308; margin-bottom: 25px;">
-        <h4 style="color: #eab308; margin-top: 0;">📜 Regulamento & Informações do Bolão</h4>
-        <p style="font-size: 16px; margin-bottom: 8px;">💰 <b>Valor da Inscrição:</b> R$ 100,00 por participante.</p>
-        <p style="font-size: 15px; margin-bottom: 5px;">⚽ <b>Sistema de Pontuação:</b></p>
-        <ul style="font-size: 14px; margin-top: 5px;">
-            <li><b>Acertou o vencedor</b> (ou acertou que haverá empate): <b>+3 pontos</b></li>
-            <li><b>Acertou o empate</b> (placar igual, ex: 1x1): <b>+1 ponto</b></li>
-            <li><b>Errou o resultado:</b> <b>0 pontos</b></li>
-            <li><b>Marcadores de Gol:</b> <b>+1 ponto</b> por gol acertado.</li>
-        </ul>
-        <p style="font-size: 13px; color: #94a3b8; margin-bottom: 0;">
-            ⚠️ <b>Anti-Abuso nos Marcadores:</b> Cada jogador escalado que passar em branco (não fizer gol) 
-            <b>ANULA</b> um acerto de gol seu. Evite colocar o time inteiro!
-        </p>
-    </div>
-    """, unsafe_html=True)
-
+    # PAINEL DE REGRAS - FORMATADO DE MANEIRA NATIVA PARA EVITAR O TYPEERROR
+    st.warning("📜 **Regulamento & Informações Importantes do Bolão**")
+    
+    col_info1, col_info2 = st.columns(2)
+    with col_info1:
+        st.markdown("💰 **Valor da Inscrição:** R$ 100,00 por participante.")
+        st.markdown("""
+        ⚽ **Sistema de Pontuação:**
+        * **Acertou o vencedor** (ou que haverá empate): **+3 pontos**
+        * **Acertou o empate exato**: **+1 ponto**
+        * **Errou o resultado**: **0 pontos**
+        """)
+    with col_info2:
+        st.markdown("""
+        🏃‍♂️ **Marcadores de Gol:**
+        * **+1 ponto** por gol acertado na rodada.
+        * ⚠️ **Regra Anti-Abuso:** Cada jogador escalado no seu palpite que passar em branco (não fizer gol real) **ANULA** um acerto seu de gol. Escolha com sabedoria!
+        """)
+    
+    st.write("---")
     st.header("Faça suas Apostas")
     fase = st.selectbox("Escolha a Rodada:", ["Rodada 1"])
     nome = st.text_input("Seu Nome Completo:", key="nome_usuario")
@@ -156,7 +157,7 @@ with aba1:
 
 # --- ABA 2: RANKING ---
 with aba2:
-    st.header("📊 Classification Geral do Bolão")
+    st.header("📊 Classificação Geral do Bolão")
     df_ranking_atual = calcular_ranking()
     if df_ranking_atual.empty:
         st.info("O ranking aparecerá aqui assim que o administrador lançar os primeiros resultados oficiais!")
