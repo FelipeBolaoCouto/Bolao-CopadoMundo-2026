@@ -30,7 +30,7 @@ def carregar_csv(arquivo, colunas):
     return pd.DataFrame(columns=colunas)
 
 # -----------------------------------------------------------------
-# CÁLCULO DO RANKING (SEM MARCADORES DE GOLS)
+# CÁLCULO DO RANKING
 # -----------------------------------------------------------------
 def calcular_ranking():
     colunas_palpites = ["Nome", "Jogo ID", "Placar 1", "Placar 2", "Campeao Apostado", "Artilheiro Apostado"]
@@ -43,7 +43,6 @@ def calcular_ranking():
         
     pontuacao = {}
     
-    # Inicializa a pontuação de todos os participantes ativos
     for nome_usuario in df_palpites["Nome"].unique():
         pontuacao[nome_usuario] = 0
 
@@ -61,7 +60,6 @@ def calcular_ranking():
                 p1_a = int(palpite["Placar 1"])
                 p2_a = int(palpite["Placar 2"])
                 
-                # Sistema de pontuação focado no placar
                 if p1_a == p1_r and p2_a == p2_r:
                     pontuacao[nome] += 3
                 else:
@@ -70,7 +68,7 @@ def calcular_ranking():
                     if resultado_real == resultado_apostado:
                         pontuacao[nome] += 1
 
-    # 2. Pontuação Master de Longo Prazo (Campeão e Artilheiro)
+    # 2. Pontuação Master (Campeão e Artilheiro)
     if not df_extras.empty:
         camp_real = str(df_extras.iloc[0]["Campeao Real"]).strip().lower()
         art_real = str(df_extras.iloc[0]["Artilheiro Real"]).strip().lower()
@@ -78,12 +76,10 @@ def calcular_ranking():
         for nome in pontuacao.keys():
             user_palpites = df_palpites[df_palpites["Nome"] == nome]
             if not user_palpites.empty:
-                # Acerto de Campeão (+5 pts)
                 camp_ap = str(user_palpites.iloc[0].get("Campeao Apostado", "")).strip().lower()
                 if camp_real and camp_ap == camp_real:
                     pontuacao[nome] += 5
                 
-                # Acerto de Artilheiro (+5 pts)
                 art_ap = str(user_palpites.iloc[0].get("Artilheiro Apostado", "")).strip().lower()
                 if art_real and art_ap == art_real:
                     pontuacao[nome] += 5
@@ -100,19 +96,10 @@ aba1, aba2, aba3 = st.tabs(["📝 Dar Palpites", "📊 Ranking Geral", "⚙️ �
 
 # --- ABA 1: FORMULÁRIO DE PALPITES ---
 with aba1:
-    # REGULAMENTO ENXUTO (SEM MARCADORES DE GOL)
     st.warning("📜 **Regulamento & Informações Importantes do Bolão**")
     
     col_info1, col_info2 = st.columns(2)
     with col_info1:
         st.markdown("💰 **Valor da Inscrição:** R$ 100,00 por participante.")
-        st.markdown("""
-        ⚽ **Sistema de Pontuação dos Placares:**
-        * 🔥 **Acertou o resultado exato** (vitória ou empate): **+3 pontos**
-        * 🎯 **Acertou o resultado** (vitória ou empate, mas errou o placar exato): **+1 ponto**
-        * ❌ **Errou o resultado completo**: **0 pontos**
-        """)
+        st.markdown("⚽ **Sistema de Pontuação dos Placares:**\n* 🔥 **Acertou o resultado exato** (vitória ou empate): **+3 pontos**\n* 🎯 **Acertou o resultado** (vitória ou empate, mas errou o placar exato): **+1 ponto**\n* ❌ **Errou o resultado completo**: **0 pontos**")
     with col_info2:
-        st.markdown("""
-        🏆 **Apostas Master de Longo Prazo:**
-        * 🥇 **Acertou o Campeão da Copa:** **+5 pontos
