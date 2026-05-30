@@ -6,7 +6,7 @@ from datetime import datetime
 st.set_page_config(page_title="Bolão Copa 2026", page_icon="🏆", layout="wide")
 
 st.title("🏆 Bolão Copa do Mundo 2026")
-st.markdown("Dê seus palpites de placar e marcadores dos gols para subir no Ranking!")
+st.markdown("Dê seus palpites de placar e concorra ao grande prêmio!")
 
 ARQUIVO_JOGOS = "palpites_jogos.csv"
 ARQUIVO_RESULTADOS = "resultados_oficiais.csv"
@@ -29,7 +29,7 @@ def carregar_csv(arquivo, colunas):
     return pd.DataFrame(columns=colunas)
 
 # -----------------------------------------------------------------
-# CÁLCULO DO RANKING (A MÁGICA DOS PONTOS)
+# CÁLCULO DO RANKING (REGRAS UNIFICADAS)
 # -----------------------------------------------------------------
 def calcular_ranking():
     df_palpites = carregar_csv(ARQUIVO_JOGOS, ["Nome", "Jogo ID", "Placar 1", "Placar 2", "Gols Apostados"])
@@ -57,17 +57,19 @@ def calcular_ranking():
             if nome not in pontuacao:
                 pontuacao[nome] = 0
                 
-            # 1. Regra de Vitória / Empate / Derrota
-            resultado_real = "M" if p1_r > p2_r else ("V" if p2_r > p1_r else "E")
-            resultado_apostado = "M" if p1_a > p2_a else ("V" if p2_a > p1_a else "E")
-            
-            if resultado_real == resultado_apostado:
-                if resultado_real == "E":
+            # --- SISTEMA DE PONTUAÇÃO DO PLACAR UNIFICADO ---
+            if p1_a == p1_r and p2_a == p2_r:
+                # Acertou o resultado exato (vitoria ou empate) -> 3 pontos
+                pontuacao[nome] += 3
+            else:
+                # Verifica se acertou a tendência/resultado (vitoria ou empate) -> 1 ponto
+                resultado_real = "M" if p1_r > p2_r else ("V" if p2_r > p1_r else "E")
+                resultado_apostado = "M" if p1_a > p2_a else ("V" if p2_a > p1_a else "E")
+                
+                if resultado_real == resultado_apostado:
                     pontuacao[nome] += 1
-                else:
-                    pontuacao[nome] += 3
             
-            # 2. Regra dos Marcadores de Gols (Com anulamento)
+            # 3. Regra dos Marcadores de Gols (Bônus Opcional com Anulamento)
             if gols_apostados and gols_reais:
                 acertos_gols = 0
                 erros_gols = 0
@@ -93,21 +95,22 @@ aba1, aba2, aba3 = st.tabs(["📝 Dar Palpites", "📊 Ranking Geral", "⚙️ �
 
 # --- ABA 1: FORMULÁRIO DE PALPITES ---
 with aba1:
-    # PAINEL DE REGRAS - FORMATADO DE MANEIRA NATIVA PARA EVITAR O TYPEERROR
+    # PAINEL DE REGRAS ATUALIZADO
     st.warning("📜 **Regulamento & Informações Importantes do Bolão**")
     
     col_info1, col_info2 = st.columns(2)
     with col_info1:
         st.markdown("💰 **Valor da Inscrição:** R$ 100,00 por participante.")
         st.markdown("""
-        ⚽ **Sistema de Pontuação:**
-        * **Acertou o vencedor** (ou que haverá empate): **+3 pontos**
-        * **Acertou o empate exato**: **+1 ponto**
-        * **Errou o resultado**: **0 pontos**
+        ⚽ **Sistema de Pontuação dos Placares:**
+        * 🔥 **Acertou o resultado exato** (vitória ou empate): **+3 pontos**
+        * 🎯 **Acertou o resultado** (vitória ou empate, mas errou o placar exato): **+1 ponto**
+        * ❌ **Errou o resultado completo**: **0 pontos**
         """)
     with col_info2:
         st.markdown("""
-        🏃‍♂️ **Marcadores de Gol:**
+        🏃‍♂️ **Bônus de Marcadores de Gol (Opcional):**
+        * **Não é obrigatório** escolher um marcador. É apenas um bônus!
         * **+1 ponto** por gol acertado na rodada.
         * ⚠️ **Regra Anti-Abuso:** Cada jogador escalado no seu palpite que passar em branco (não fizer gol real) **ANULA** um acerto seu de gol. Escolha com sabedoria!
         """)
@@ -118,7 +121,7 @@ with aba1:
     nome = st.text_input("Seu Nome Completo:", key="nome_usuario")
     
     if nome.strip() != "":
-        st.info("💡 Digite os nomes dos jogadores que farão gols separados por vírgula (Ex: Neymar, Vini Jr). Se ninguém fizer gol, deixe em branco.")
+        st.info("💡 Digite os nomes dos jogadores que farão gols separados por vírgula (Ex: Neymar, Vini Jr). Se preferir não usar o bônus, deixe em branco.")
         palpites_form = {}
         
         for jogo in [j for j in JOGOS_COPA if j["fase"] == fase]:
@@ -130,7 +133,7 @@ with aba1:
             with c4: p2 = st.number_input("Placar", min_value=0, max_value=15, step=1, key=f"p2_{jogo['id']}")
             with c5: st.write(f"**{jogo['time2']}**")
             
-            gols = st.text_input(f"Quem fará os gols de {jogo['time1']} x {jogo['time2']}?", placeholder="Ex: Neymar, Vini Jr", key=f"gols_{jogo['id']}")
+            gols = st.text_input(f"Quem fará os gols de {jogo['time1']} x {jogo['time2']}? (Opcional)", placeholder="Ex: Neymar, Vini Jr", key=f"gols_{jogo['id']}")
             
             palpites_form[jogo['id']] = {"t1": jogo['time1'], "t2": jogo['time2'], "p1": p1, "p2": p2, "gols": gols}
             st.write("---")
@@ -167,7 +170,7 @@ with aba2:
 # --- ABA 3: ADMINISTRAÇÃO ---
 with aba3:
     st.header("⚙️ Painel do Organizador")
-    senha = st.text_input("Senha do Administrador:", type="password")
+    senha = st.text_input("Senha do Admin:", type="password")
     
     if senha == "1234":
         st.subheader("Inserir Resultado Oficial do Jogo")
