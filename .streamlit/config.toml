@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#22c55e"          # Verde para botões e destaques
+backgroundColor = "#0f172a"       # Fundo escuro (Slate azulado)
+secondaryBackgroundColor = "#1e293b" # Fundo dos menus e cards
+textColor = "#f8fafc"             # Texto branco/claro
+font = "sans serif"
