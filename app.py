@@ -99,7 +99,4 @@ with aba1:
     st.warning("📜 **Regulamento & Informações Importantes do Bolão**")
     
     col_info1, col_info2 = st.columns(2)
-    with col_info1:
-        st.markdown("💰 **Valor da Inscrição:** R$ 100,00 por participante.")
-        st.markdown("⚽ **Sistema de Pontuação dos Placares:**\n* 🔥 **Acertou o resultado exato** (vitória ou empate): **+3 pontos**\n* 🎯 **Acertou o resultado** (vitória ou empate, mas errou o placar exato): **+1 ponto**\n* ❌ **Errou o resultado completo**: **0 pontos**")
-    with col_info2:
+    with col_info
