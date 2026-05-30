@@ -1,6 +1,6 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+import os
 from datetime import datetime
 
 # Configuração da página
@@ -9,11 +9,18 @@ st.set_page_config(page_title="Bolão Copa 2026", page_icon="🏆", layout="cent
 st.title("🏆 Bolão Copa do Mundo 2026")
 st.markdown("Insira o seu nome e dê os seus palpites para entrar no ranking oficial!")
 
-# URL da sua planilha do Google (com permissão de Editor)
-URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1no9zRPwJxa1FiEyWh3oEIf2SD6DMp64-PNQG6H46bA8/edit?usp=sharing"
+# Nome do arquivo onde os dados serão salvos dentro do servidor do Streamlit
+ARQUIVO_DADOS = "palpites.csv"
 
-# Estabelecer conexão com o Google Sheets
-conn = st.connection("gsheets", type=GSheetsConnection)
+# Função para carregar os dados existentes
+def carregar_dados():
+    if os.path.exists(ARQUIVO_DADOS):
+        try:
+            return pd.read_csv(ARQUIVO_DADOS)
+        except:
+            return pd.DataFrame(columns=["Data Hora", "Nome", "Palpite Campeao", "Palpite Vice"])
+    else:
+        return pd.DataFrame(columns=["Data Hora", "Nome", "Palpite Campeao", "Palpite Vice"])
 
 # -----------------------------------------------------------------
 # FORMULÁRIO DE INSCRIÇÃO / PALPITES
@@ -31,15 +38,10 @@ if botao_enviar:
     if nome.strip() == "" or campeao.strip() == "" or vice.strip() == "":
         st.error("⚠️ Por favor, preencha todos os campos antes de enviar!")
     else:
-        try:
-            # 1. Ler os dados existentes para não apagar o que já foi salvo
-            dados_existentes = conn.read(spreadsheet=URL_PLANILHA, usecols=[0, 1, 2, 3])
-            df_atual = pd.DataFrame(dados_existentes)
-        except Exception:
-            # Se a planilha estiver totalmente vazia e der erro na leitura, cria um DataFrame limpo
-            df_atual = pd.DataFrame(columns=["Data Hora", "Nome", "Palpite Campeao", "Palpite Vice"])
+        # 1. Carrega o histórico
+        df_atual = carregar_dados()
         
-        # 2. Criar a nova linha com o palpite atual
+        # 2. Cria a nova linha
         nova_linha = {
             "Data Hora": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
             "Nome": nome.strip(),
@@ -47,13 +49,11 @@ if botao_enviar:
             "Palpite Vice": vice.strip()
         }
         
-        # 3. Juntar o novo palpite aos dados antigos
+        # 3. Adiciona e salva no arquivo
         df_novo = pd.concat([df_atual, pd.DataFrame([nova_linha])], ignore_index=True)
+        df_novo.to_csv(ARQUIVO_DADOS, index=False)
         
-        # 4. Gravar de volta na planilha do Google
-        conn.update(spreadsheet=URL_PLANILHA, data=df_novo)
-        
-        st.success(f"🎉 Maravilha, {nome}! O seu palpite foi registrado com sucesso!")
+        st.success(f"🎉 Maravilha, {nome}! O seu palpite foi registrado com sucesso! Atualize a página se necessário.")
 
 # -----------------------------------------------------------------
 # VISUALIZAÇÃO DOS PARTICIPANTES (RANKING / LISTA)
@@ -61,22 +61,17 @@ if botao_enviar:
 st.write("---")
 st.header("📊 Participantes Confirmados")
 
-try:
-    # Ler os dados atualizados para exibir na tela
-    dados_finais = conn.read(spreadsheet=URL_PLANILHA)
-    df_finais = pd.DataFrame(dados_finais)
+df_exibir = carregar_dados()
+
+if df_exibir.empty or len(df_exibir) == 0:
+    st.info("Ainda não temos participantes cadastrados. Seja o primeiro! ⚽")
+else:
+    # Remove linhas em branco por segurança
+    df_exibir = df_exibir.dropna(subset=["Nome"])
     
-    if df_finais.empty or len(df_finais) == 0:
-        st.info("Ainda não temos participantes cadastrados. Seja o primeiro! ⚽")
-    else:
-        # Remover linhas totalmente vazias que o Google Sheets possa trazer por engano
-        df_finais = df_finais.dropna(subset=["Nome"])
-        
-        # Exibir a tabela bonita para os usuários acompanharem os palpites uns dos outros
-        st.dataframe(
-            df_finais[["Nome", "Palpite Campeao", "Palpite Vice"]], 
-            use_container_width=True,
-            hide_index=True
-        )
-except Exception as e:
-    st.info("Aguardando os primeiros cadastros para exibir o pódio! 🕒")
+    # Exibe a tabela na tela
+    st.dataframe(
+        df_exibir[["Nome", "Palpite Campeao", "Palpite Vice"]], 
+        use_container_width=True,
+        hide_index=True
+    )
