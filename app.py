@@ -173,4 +173,4 @@ with aba3:
             }
             df_res_final = pd.concat([df_res_atual, pd.DataFrame([nova_linha_res])], ignore_index=True)
             df_res_final.to_csv(ARQUIVO_RESULTADOS, index=False)
-            st.success("⚽ Resultado e marcadores publicados! O ranking foi recalculado.")s
+            st.success("⚽ Resultado e marcadores publicados! O ranking foi recalculado.")
