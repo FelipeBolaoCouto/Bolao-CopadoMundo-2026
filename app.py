@@ -10,6 +10,7 @@ st.markdown("Dê seus palpites de placar e concorra ao grande prêmio!")
 
 ARQUIVO_JOGOS = "palpites_jogos.csv"
 ARQUIVO_RESULTADOS = "resultados_oficiais.csv"
+ARQUIVO_EXTRAS = "resultados_extras.csv" # Novo arquivo para Campeão e Artilheiro oficiais
 
 # Lista de jogos cadastrados
 JOGOS_COPA = [
@@ -29,60 +30,78 @@ def carregar_csv(arquivo, colunas):
     return pd.DataFrame(columns=colunas)
 
 # -----------------------------------------------------------------
-# CÁLCULO DO RANKING (CORRIGIDO)
+# CÁLCULO DO RANKING (ATUALIZADO COM CAMPEÃO E ARTILHEIRO)
 # -----------------------------------------------------------------
 def calcular_ranking():
-    df_palpites = carregar_csv(ARQUIVO_JOGOS, ["Nome", "Jogo ID", "Placar 1", "Placar 2", "Gols Apostados"])
+    colunas_palpites = ["Nome", "Jogo ID", "Placar 1", "Placar 2", "Gols Apostados", "Campeao Apostado", "Artilheiro Apostado"]
+    df_palpites = carregar_csv(ARQUIVO_JOGOS, colunas_palpites)
     df_resultados = carregar_csv(ARQUIVO_RESULTADOS, ["Jogo ID", "Placar 1 Real", "Placar 2 Real", "Gols Reais"])
+    df_extras = carregar_csv(ARQUIVO_EXTRAS, ["Campeao Real", "Artilheiro Real"])
     
-    if df_palpites.empty or df_resultados.empty:
+    if df_palpites.empty:
         return pd.DataFrame(columns=["Posição", "Nome", "Pontos Totais"])
         
     pontuacao = {}
     
-    for _, res in df_resultados.iterrows():
-        j_id = int(res["Jogo ID"])
-        p1_r = int(res["Placar 1 Real"])
-        p2_r = int(res["Placar 2 Real"])
-        gols_reais = [g.strip().lower() for g in str(res["Gols Reais"]).split(",") if g.strip()]
-        
-        palpites_jogo = df_palpites[df_palpites["Jogo ID"] == j_id]
-        
-        # LINHA CORRIGIDA AQUI: Removido o erro de sintaxe
-        for _, palpite in palpites_jogo.iterrows():
-            nome = palpite["Nome"]
-            p1_a = int(palpite["Placar 1"])
-            p2_a = int(palpite["Placar 2"])
-            gols_apostados = [g.strip().lower() for g in str(palpite["Gols Apostados"]).split(",") if g.strip()]
+    # Inicializa a pontuação de todo mundo que jogou
+    for nome_usuario in df_palpites["Nome"].unique():
+        pontuacao[nome_usuario] = 0
+
+    # 1. Pontuação por Jogos
+    if not df_resultados.empty:
+        for _, res in df_resultados.iterrows():
+            j_id = int(res["Jogo ID"])
+            p1_r = int(res["Placar 1 Real"])
+            p2_r = int(res["Placar 2 Real"])
+            gols_reais = [g.strip().lower() for g in str(res["Gols Reais"]).split(",") if g.strip()]
             
-            if nome not in pontuacao:
-                pontuacao[nome] = 0
-                
-            # --- SISTEMA DE PONTUAÇÃO DO PLACAR UNIFICADO ---
-            if p1_a == p1_r and p2_a == p2_r:
-                # Acertou o resultado exato (vitória ou empate) -> 3 pontos
-                pontuacao[nome] += 3
-            else:
-                # Verifica se acertou a tendência/resultado (vitória ou empate) -> 1 ponto
-                resultado_real = "M" if p1_r > p2_r else ("V" if p2_r > p1_r else "E")
-                resultado_apostado = "M" if p1_a > p2_a else ("V" if p2_a > p1_a else "E")
-                
-                if resultado_real == resultado_apostado:
-                    pontuacao[nome] += 1
+            palpites_jogo = df_palpites[df_palpites["Jogo ID"] == j_id]
             
-            # 3. Regra dos Marcadores de Gols (Bônus Opcional com Anulamento)
-            if gols_apostados and gols_reais:
-                acertos_gols = 0
-                erros_gols = 0
+            for _, palpite in palpites_jogo.iterrows():
+                nome = palpite["Nome"]
+                p1_a = int(palpite["Placar 1"])
+                p2_a = int(palpite["Placar 2"])
+                gols_apostados = [g.strip().lower() for g in str(palpite["Gols Apostados"]).split(",") if g.strip()]
                 
-                for jogador in gols_apostados:
-                    if jogador in gols_reais:
-                        acertos_gols += gols_reais.count(jogador)
-                    else:
-                        erros_gols += 1
+                # Sistema de pontuação do placar
+                if p1_a == p1_r and p2_a == p2_r:
+                    pontuacao[nome] += 3
+                else:
+                    resultado_real = "M" if p1_r > p2_r else ("V" if p2_r > p1_r else "E")
+                    resultado_apostado = "M" if p1_a > p2_a else ("V" if p2_a > p1_a else "E")
+                    if resultado_real == resultado_apostado:
+                        pontuacao[nome] += 1
                 
-                pontos_gols = max(0, acertos_gols - erros_gols)
-                pontuacao[nome] += pontos_gols
+                # Bônus de marcadores de gol
+                if gols_apostados and gols_reais:
+                    acertos_gols = 0
+                    erros_gols = 0
+                    for jogador in gols_apostados:
+                        if jogador in gols_reais:
+                            acertos_gols += gols_reais.count(jogador)
+                        else:
+                            erros_gols += 1
+                    pontos_gols = max(0, acertos_gols - erros_gols)
+                    pontuacao[nome] += pontos_gols
+
+    # 2. Pontuação dos Extras (Campeão e Artilheiro de longo prazo)
+    if not df_extras.empty:
+        camp_real = str(df_extras.iloc[0]["Campeao Real"]).strip().lower()
+        art_real = str(df_extras.iloc[0]["Artilheiro Real"]).strip().lower()
+        
+        # Pega o primeiro registro de palpite de cada usuário para checar as apostas master dele
+        for nome in pontuacao.keys():
+            user_palpites = df_palpites[df_palpites["Nome"] == nome]
+            if not user_palpites.empty:
+                # Compara Campeão (+5 pts)
+                camp_ap = str(user_palpites.iloc[0].get("Campeao Apostado", "")).strip().lower()
+                if camp_real and camp_ap == camp_real:
+                    pontuacao[nome] += 5
+                
+                # Compara Artilheiro (+5 pts)
+                art_ap = str(user_palpites.iloc[0].get("Artilheiro Apostado", "")).strip().lower()
+                if art_real and art_ap == art_real:
+                    pontuacao[nome] += 5
 
     df_rank = pd.DataFrame(list(pontuacao.items()), columns=["Nome", "Pontos Totais"])
     df_rank = df_rank.sort_values(by="Pontos Totais", ascending=False).reset_index(drop=True)
@@ -96,7 +115,6 @@ aba1, aba2, aba3 = st.tabs(["📝 Dar Palpites", "📊 Ranking Geral", "⚙️ �
 
 # --- ABA 1: FORMULÁRIO DE PALPITES ---
 with aba1:
-    # PAINEL DE REGRAS
     st.warning("📜 **Regulamento & Informações Importantes do Bolão**")
     
     col_info1, col_info2 = st.columns(2)
@@ -113,16 +131,31 @@ with aba1:
         🏃‍♂️ **Bônus de Marcadores de Gol (Opcional):**
         * **:red[🚨 Não é obrigatório escolher um marcador. É apenas um bônus!]**
         * **+1 ponto** por gol acertado na rodada.
-        * ⚠️ **Regra Anti-Abuso:** Cada jogador escalado no seu palpite que passar em branco (não fizer gol real) **ANULA** um acerto seu de gol. Escolha com sabedoria!
+        * ⚠️ **Regra Anti-Abuso:** Cada jogador escalado no seu palpite que passar em branco **ANULA** um acerto de gol.
+        
+        🏆 **Apostas Master de Longo Prazo:**
+        * 🥇 **Acertou o Campeão da Copa:** **+5 pontos**
+        * 👟 **Acertou o Artilheiro do Torneio:** **+5 pontos**
         """)
     
     st.write("---")
     st.header("Faça suas Apostas")
-    fase = st.selectbox("Escolha a Rodada:", ["Rodada 1"])
+    
     nome = st.text_input("Seu Nome Completo:", key="nome_usuario")
     
     if nome.strip() != "":
+        # Campos novos de longo prazo colocados em destaque logo no início do formulário
+        st.subheader("🔮 Apostas Master da Copa (Preencha uma vez)")
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            camp_aposta = st.text_input("Quem será o Grande Campeão da Copa 2026?", placeholder="Ex: Brasil", key="camp_aposta")
+        with col_m2:
+            art_aposta = st.text_input("Quem será o Artilheiro do Campeonato?", placeholder="Ex: Vini Jr", key="art_aposta")
+            
+        st.write("---")
+        fase = st.selectbox("Escolha a Rodada:", ["Rodada 1"])
         st.info("💡 Digite os nomes dos jogadores que farão gols separados por vírgula (Ex: Neymar, Vini Jr). Se preferir não usar o bônus, deixe em branco.")
+        
         palpites_form = {}
         
         for jogo in [j for j in JOGOS_COPA if j["fase"] == fase]:
@@ -140,7 +173,7 @@ with aba1:
             st.write("---")
             
         if st.button("🚀 Salvar Meus Palpites"):
-            df_atual = carregar_csv(ARQUIVO_JOGOS, ["Data Hora", "Nome", "Jogo ID", "Confronto", "Placar 1", "Placar 2", "Gols Apostados"])
+            df_atual = carregar_csv(ARQUIVO_JOGOS, ["Data Hora", "Nome", "Jogo ID", "Confronto", "Placar 1", "Placar 2", "Gols Apostados", "Campeao Apostado", "Artilheiro Apostado"])
             novas_linhas = []
             
             for j_id, dados in palpites_form.items():
@@ -151,11 +184,13 @@ with aba1:
                     "Confronto": f"{dados['t1']} x {dados['t2']}",
                     "Placar 1": int(dados["p1"]),
                     "Placar 2": int(dados["p2"]),
-                    "Gols Apostados": dados["gols"].strip()
+                    "Gols Apostados": dados["gols"].strip(),
+                    "Campeao Apostado": camp_aposta.strip(),
+                    "Artilheiro Apostado": art_aposta.strip()
                 })
             df_final = pd.concat([df_atual, pd.DataFrame(novas_linhas)], ignore_index=True)
             df_final.to_csv(ARQUIVO_JOGOS, index=False)
-            st.success("🎉 Seus palpites foram registrados!")
+            st.success("🎉 Seus palpites e apostas master foram registrados com sucesso!")
     else:
         st.warning("Insira seu nome completo para liberar os campos de apostas.")
 
@@ -174,16 +209,17 @@ with aba3:
     senha = st.text_input("Senha do Admin:", type="password")
     
     if senha == "1234":
-        st.subheader("Inserir Resultado Oficial do Jogo")
+        # Parte 1: Resultados dos Jogos Normais
+        st.subheader("1. Inserir Resultado Oficial do Jogo")
         jogo_sel = st.selectbox("Selecione o Jogo Finalizado:", JOGOS_COPA, format_func=lambda x: f"{x['time1']} x {x['time2']}")
         
         col_r1, col_r2 = st.columns(2)
         with col_r1: res_p1 = st.number_input(f"Placar Real {jogo_sel['time1']}", min_value=0, step=1)
         with col_r2: res_p2 = st.number_input(f"Placar Real {jogo_sel['time2']}", min_value=0, step=1)
             
-        gols_reais_input = st.text_input("Quem marcou os gols na realidade? (Separados por vírgula)", placeholder="Ex: Neymar, Neymar, Marroquino")
+        gols_reais_input = st.text_input("Quem marcou os gols? (Separados por vírgula)", placeholder="Ex: Neymar, Vini Jr")
         
-        if st.button("💾 Publicar Resultado Oficial"):
+        if st.button("💾 Publicar Resultado do Jogo"):
             df_res_atual = carregar_csv(ARQUIVO_RESULTADOS, ["Jogo ID", "Placar 1 Real", "Placar 2 Real", "Gols Reais"])
             df_res_atual = df_res_atual[df_res_atual["Jogo ID"] != jogo_sel["id"]]
             
@@ -195,4 +231,28 @@ with aba3:
             }
             df_res_final = pd.concat([df_res_atual, pd.DataFrame([nova_linha_res])], ignore_index=True)
             df_res_final.to_csv(ARQUIVO_RESULTADOS, index=False)
-            st.success("⚽ Resultado e marcadores publicados! O ranking foi recalculado.")
+            st.success("⚽ Resultado do jogo publicado!")
+
+        st.write("---")
+        
+        # Parte 2: Lançamento Final do Campeão e Artilheiro
+        st.subheader("2. Definir Encerramento da Copa (Campeão & Artilheiro Real)")
+        st.info("Deixe em branco até o final do campeonato. Quando preenchido, o sistema somará os 5 pontos extras automaticamente no ranking.")
+        
+        df_ex_atual = carregar_csv(ARQUIVO_EXTRAS, ["Campeao Real", "Artilheiro Real"])
+        val_camp_inicial = df_ex_atual.iloc[0]["Campeao Real"] if not df_ex_atual.empty else ""
+        val_art_inicial = df_ex_atual.iloc[0]["Artilheiro Real"] if not df_ex_atual.empty else ""
+        
+        col_adm1, col_adm2 = st.columns(2)
+        with col_adm1:
+            camp_oficial = st.text_input("Campeão Oficial da Copa:", value=val_camp_inicial)
+        with col_adm2:
+            art_oficial = st.text_input("Artilheiro Oficial da Copa:", value=val_art_inicial)
+            
+        if st.button("🏆 Publicar Encerramento da Copa"):
+            df_novo_extra = pd.DataFrame([{
+                "Campeao Real": camp_oficial.strip(),
+                "Artilheiro Real": art_oficial.strip()
+            }])
+            df_novo_extra.to_csv(ARQUIVO_EXTRAS, index=False)
+            st.success("🎉 Ganhadores oficiais da Copa publicados! Pontos extras adicionados ao ranking.")
